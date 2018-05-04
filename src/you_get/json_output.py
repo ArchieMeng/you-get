@@ -4,6 +4,7 @@ import json
 # save info from common.print_info()
 last_info = None
 
+
 def output(video_extractor, pretty_print=True):
     ve = video_extractor
     out = {}
@@ -27,6 +28,7 @@ def output(video_extractor, pretty_print=True):
         print(json.dumps(out, indent=4, sort_keys=True, ensure_ascii=False))
     else:
         print(json.dumps(out))
+    return out
 
 # a fake VideoExtractor object to save info
 class VideoExtractor(object):
