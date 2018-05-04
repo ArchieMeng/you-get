@@ -602,6 +602,9 @@ def url_save(
 
     continue_renameing = True
     while continue_renameing:
+        if 'download_info' in kwargs:
+            if kwargs['download_info']['stop']:
+                sys.exit(0)
         continue_renameing = False
         if os.path.exists(filepath):
             if not force and file_size == os.path.getsize(filepath):
@@ -650,6 +653,9 @@ def url_save(
                 bar.update_received(os.path.getsize(temp_filepath))
     else:
         open_mode = 'wb'
+
+    if 'download_info' in kwargs:
+        kwargs['download_info']['received'] = kwargs['download_info'].get('received', 0) + received
 
     if received < file_size:
         if faker:
@@ -713,6 +719,8 @@ def url_save(
                     continue
                 output.write(buffer)
                 received += len(buffer)
+                if 'download_info' in kwargs:
+                    kwargs['download_info']['received'] += len(buffer)
                 if bar:
                     bar.update_received(len(buffer))
 
@@ -838,13 +846,26 @@ class DummyProgressBar:
         pass
 
 
-def get_output_filename(urls, title, ext, output_dir, merge):
-    # lame hack for the --output-filename option
+def get_output_filename(urls, title, ext, output_dir, merge, custom_filename=None):
+    """
+    get final output file name
+    :param urls: urls to download
+    :param title: video title
+    :param ext: video extensions name
+    :param custom_filename: user defined output filename
+    :param output_dir: output directory
+    :param merge: need to merge or not
+    :return: output filename
+    """
     global output_filename
     if output_filename:
         if ext:
             return output_filename + '.' + ext
         return output_filename
+    elif custom_filename:
+        if ext:
+            return custom_filename + '.' + ext
+        return custom_filename
 
     merged_ext = ext
     if (len(urls) > 1) and merge:
@@ -870,8 +891,11 @@ def print_user_agent(faker=False):
 
 def download_urls(
     urls, title, ext, total_size, output_dir='.', refer=None, merge=True,
-    faker=False, headers={}, **kwargs
+    faker=False, headers=None, **kwargs
 ):
+    global output_filename
+    if headers is None:
+        headers = {}
     assert urls
     if json_output:
         json_output_.download_urls(
@@ -897,25 +921,29 @@ def download_urls(
             pass
 
     title = tr(get_filename(title))
-    output_filename = get_output_filename(urls, title, ext, output_dir, merge)
-    output_filepath = os.path.join(output_dir, output_filename)
+    custom_filename = kwargs.get('output_filename', None)
+    result_output_filename = get_output_filename(urls, title, ext, output_dir, merge, custom_filename)
+    result_output_filepath = os.path.join(output_dir, result_output_filename)
 
     if total_size:
-        if not force and os.path.exists(output_filepath) and not auto_rename\
-                and os.path.getsize(output_filepath) >= total_size * 0.9:
-            print('Skipping %s: file already exists' % output_filepath)
+        if not force and os.path.exists(result_output_filepath) and not auto_rename\
+                and os.path.getsize(result_output_filepath) >= total_size * 0.9:
+            print('Skipping %s: file already exists' % result_output_filepath)
             print()
             return
         bar = SimpleProgressBar(total_size, len(urls))
     else:
         bar = PiecesProgressBar(total_size, len(urls))
 
+    if 'download_info' in kwargs:
+        kwargs['download_info']['total_size'] = total_size
+
     if len(urls) == 1:
         url = urls[0]
-        print('Downloading %s ...' % tr(output_filename))
+        print('Downloading %s ...' % tr(result_output_filename))
         bar.update()
         url_save(
-            url, output_filepath, bar, refer=refer, faker=faker,
+            url, result_output_filepath, bar, refer=refer, faker=faker,
             headers=headers, **kwargs
         )
         bar.done()
@@ -924,6 +952,8 @@ def download_urls(
         print('Downloading %s.%s ...' % (tr(title), ext))
         bar.update()
         for i, url in enumerate(urls):
+            # change title when a filename has been specific by user or caller
+            title = output_filename or custom_filename or title
             filename = '%s[%02d].%s' % (title, i, ext)
             filepath = os.path.join(output_dir, filename)
             parts.append(filepath)
@@ -943,8 +973,8 @@ def download_urls(
             from .processor.ffmpeg import has_ffmpeg_installed
             if has_ffmpeg_installed():
                 from .processor.ffmpeg import ffmpeg_concat_av
-                ret = ffmpeg_concat_av(parts, output_filepath, ext)
-                print('Merged into %s' % output_filename)
+                ret = ffmpeg_concat_av(parts, result_output_filepath, ext)
+                print('Merged into %s' % result_output_filename)
                 if ret == 0:
                     for part in parts:
                         os.remove(part)
@@ -954,11 +984,11 @@ def download_urls(
                 from .processor.ffmpeg import has_ffmpeg_installed
                 if has_ffmpeg_installed():
                     from .processor.ffmpeg import ffmpeg_concat_flv_to_mp4
-                    ffmpeg_concat_flv_to_mp4(parts, output_filepath)
+                    ffmpeg_concat_flv_to_mp4(parts, result_output_filepath)
                 else:
                     from .processor.join_flv import concat_flv
-                    concat_flv(parts, output_filepath)
-                print('Merged into %s' % output_filename)
+                    concat_flv(parts, result_output_filepath)
+                print('Merged into %s' % result_output_filename)
             except:
                 raise
             else:
@@ -970,11 +1000,11 @@ def download_urls(
                 from .processor.ffmpeg import has_ffmpeg_installed
                 if has_ffmpeg_installed():
                     from .processor.ffmpeg import ffmpeg_concat_mp4_to_mp4
-                    ffmpeg_concat_mp4_to_mp4(parts, output_filepath)
+                    ffmpeg_concat_mp4_to_mp4(parts, result_output_filepath)
                 else:
                     from .processor.join_mp4 import concat_mp4
-                    concat_mp4(parts, output_filepath)
-                print('Merged into %s' % output_filename)
+                    concat_mp4(parts, result_output_filepath)
+                print('Merged into %s' % result_output_filename)
             except:
                 raise
             else:
@@ -986,11 +1016,11 @@ def download_urls(
                 from .processor.ffmpeg import has_ffmpeg_installed
                 if has_ffmpeg_installed():
                     from .processor.ffmpeg import ffmpeg_concat_ts_to_mkv
-                    ffmpeg_concat_ts_to_mkv(parts, output_filepath)
+                    ffmpeg_concat_ts_to_mkv(parts, result_output_filepath)
                 else:
                     from .processor.join_ts import concat_ts
-                    concat_ts(parts, output_filepath)
-                print('Merged into %s' % output_filename)
+                    concat_ts(parts, result_output_filepath)
+                print('Merged into %s' % result_output_filename)
             except:
                 raise
             else:
@@ -1605,7 +1635,7 @@ def url_to_module(url):
 
 def any_download(url, **kwargs):
     m, url = url_to_module(url)
-    m.download(url, **kwargs)
+    return m.download(url, **kwargs)
 
 
 def any_download_playlist(url, **kwargs):

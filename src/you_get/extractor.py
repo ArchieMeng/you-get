@@ -56,7 +56,7 @@ class VideoExtractor():
 
         self.extract(**kwargs)
 
-        self.download(**kwargs)
+        return self.download(**kwargs)
 
     def download_by_vid(self, vid, **kwargs):
         self.url = None
@@ -169,6 +169,34 @@ class VideoExtractor():
         print("playlist:            %s" % self.title)
         print("videos:")
 
+    def get_ext_name(self, **kwargs):
+        if 'stream_id' in kwargs and kwargs['stream_id']:
+            # Download the stream
+            stream_id = kwargs['stream_id']
+        else:
+            # Download stream with the best quality
+            from .processor.ffmpeg import has_ffmpeg_installed
+            stream_id = self.streams_sorted[0]['id'] if 'id' in self.streams_sorted[0] else self.streams_sorted[0][
+                'itag']
+
+        if 'index' not in kwargs:
+            self.p(stream_id)
+        else:
+            self.p_i(stream_id)
+
+        if stream_id in self.streams:
+            urls = self.streams[stream_id]['src']
+            ext = self.streams[stream_id]['container']
+            total_size = self.streams[stream_id]['size']
+        else:
+            urls = self.dash_streams[stream_id]['src']
+            ext = self.dash_streams[stream_id]['container']
+            total_size = self.dash_streams[stream_id]['size']
+
+        if ext == 'm3u8':
+            ext = 'mp4'
+        return ext
+
     def download(self, **kwargs):
         if 'json_output' in kwargs and kwargs['json_output']:
             json_output.output(self)
@@ -223,9 +251,8 @@ class VideoExtractor():
             if self.referer is not None:
                 headers['Referer'] = self.referer
             download_urls(urls, self.title, ext, total_size, headers=headers,
-                          output_dir=kwargs['output_dir'],
-                          merge=kwargs['merge'],
-                          av=stream_id in self.dash_streams)
+                          av=stream_id in self.dash_streams,
+                          **kwargs)
             if 'caption' not in kwargs or not kwargs['caption']:
                 print('Skipping captions or danmuku.')
                 return
@@ -246,5 +273,14 @@ class VideoExtractor():
             # For main_dev()
             #download_urls(urls, self.title, self.streams[stream_id]['container'], self.streams[stream_id]['size'])
         keep_obj = kwargs.get('keep_obj', False)
+
+        if not hasattr(self.download, 'ext'):
+            ext = self.get_ext_name(**kwargs)
+        stream_info = {
+            "url": self.url,
+            "title": self.title,
+            "ext": ext
+        }
         if not keep_obj:
             self.__init__()
+        return stream_info
