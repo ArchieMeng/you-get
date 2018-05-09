@@ -19,7 +19,11 @@ from .util import log, term
 from .util.git import get_version
 from .util.strings import get_filename, unescape_html
 from . import json_output as json_output_
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
+# dirty fix for crashes on android
+try:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
+except:
+    pass
 
 SITES = {
     '163'              : 'netease',
@@ -145,10 +149,14 @@ fake_headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:51.0) Gecko/20100101 Firefox/51.0',  # noqa
 }
 
-if sys.stdout.isatty():
-    default_encoding = sys.stdout.encoding.lower()
-else:
-    default_encoding = locale.getpreferredencoding().lower()
+# dirty fix for crashes on android
+try:
+    if sys.stdout.isatty():
+        default_encoding = sys.stdout.encoding.lower()
+    else:
+        default_encoding = locale.getpreferredencoding().lower()
+except:
+    default_encoding = 'utf-8'
 
 
 def rc4(key, data):
@@ -602,9 +610,6 @@ def url_save(
 
     continue_renameing = True
     while continue_renameing:
-        if 'download_info' in kwargs:
-            if kwargs['download_info']['stop']:
-                sys.exit(0)
         continue_renameing = False
         if os.path.exists(filepath):
             if not force and file_size == os.path.getsize(filepath):
@@ -655,7 +660,7 @@ def url_save(
         open_mode = 'wb'
 
     if 'download_info' in kwargs:
-        kwargs['download_info']['received'] = kwargs['download_info'].get('received', 0) + received
+        kwargs['download_info']['received'] = received
 
     if received < file_size:
         if faker:
@@ -703,6 +708,10 @@ def url_save(
 
         with open(temp_filepath, open_mode) as output:
             while True:
+                if 'download_info' in kwargs:
+                    if kwargs['download_info']['stop']:
+                        sys.exit(0)
+
                 buffer = None
                 try:
                     buffer = response.read(1024 * 256)
