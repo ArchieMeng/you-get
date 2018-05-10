@@ -13,123 +13,138 @@ import argparse
 from http import cookiejar
 from importlib import import_module
 from urllib import request, parse, error
+import ssl
 
 from .version import __version__
 from .util import log, term
 from .util.git import get_version
 from .util.strings import get_filename, unescape_html
 from . import json_output as json_output_
+
 # dirty fix for crashes on android
 try:
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 except:
     pass
 
+# dirty fix for ssl certificate failed
+ctx = ssl._create_unverified_context()
+original_urlopen = request.urlopen
+
+
+def urlopen_with_unverified_context(*args, **kwargs):
+    global original_urlopen
+    return original_urlopen(context=ctx, *args, **kwargs)
+
+
+
+request.urlopen = urlopen_with_unverified_context
+
 SITES = {
-    '163'              : 'netease',
-    '56'               : 'w56',
-    'acfun'            : 'acfun',
-    'archive'          : 'archive',
-    'baidu'            : 'baidu',
-    'bandcamp'         : 'bandcamp',
-    'baomihua'         : 'baomihua',
-    'bigthink'         : 'bigthink',
-    'bilibili'         : 'bilibili',
-    'cctv'             : 'cntv',
-    'cntv'             : 'cntv',
-    'cbs'              : 'cbs',
-    'coub'             : 'coub',
-    'dailymotion'      : 'dailymotion',
-    'dilidili'         : 'dilidili',
-    'douban'           : 'douban',
-    'douyin'           : 'douyin',
-    'douyu'            : 'douyutv',
-    'ehow'             : 'ehow',
-    'facebook'         : 'facebook',
-    'fantasy'          : 'fantasy',
-    'fc2'              : 'fc2video',
-    'flickr'           : 'flickr',
-    'freesound'        : 'freesound',
-    'fun'              : 'funshion',
-    'google'           : 'google',
-    'giphy'            : 'giphy',
-    'heavy-music'      : 'heavymusic',
-    'huaban'           : 'huaban',
-    'huomao'           : 'huomaotv',
-    'iask'             : 'sina',
-    'icourses'         : 'icourses',
-    'ifeng'            : 'ifeng',
-    'imgur'            : 'imgur',
-    'in'               : 'alive',
-    'infoq'            : 'infoq',
-    'instagram'        : 'instagram',
-    'interest'         : 'interest',
-    'iqilu'            : 'iqilu',
-    'iqiyi'            : 'iqiyi',
-    'ixigua'           : 'ixigua',
-    'isuntv'           : 'suntv',
-    'joy'              : 'joy',
-    'kankanews'        : 'bilibili',
-    'khanacademy'      : 'khan',
-    'ku6'              : 'ku6',
-    'kuaishou'         : 'kuaishou',
-    'kugou'            : 'kugou',
-    'kuwo'             : 'kuwo',
-    'le'               : 'le',
-    'letv'             : 'le',
-    'lizhi'            : 'lizhi',
-    'longzhu'          : 'longzhu',
-    'magisto'          : 'magisto',
-    'metacafe'         : 'metacafe',
-    'mgtv'             : 'mgtv',
-    'miomio'           : 'miomio',
-    'mixcloud'         : 'mixcloud',
-    'mtv81'            : 'mtv81',
-    'musicplayon'      : 'musicplayon',
-    'naver'            : 'naver',
-    '7gogo'            : 'nanagogo',
-    'nicovideo'        : 'nicovideo',
-    'panda'            : 'panda',
-    'pinterest'        : 'pinterest',
-    'pixnet'           : 'pixnet',
-    'pptv'             : 'pptv',
-    'qingting'         : 'qingting',
-    'qq'               : 'qq',
-    'quanmin'          : 'quanmin',
-    'showroom-live'    : 'showroom',
-    'sina'             : 'sina',
-    'smgbb'            : 'bilibili',
-    'sohu'             : 'sohu',
-    'soundcloud'       : 'soundcloud',
-    'ted'              : 'ted',
-    'theplatform'      : 'theplatform',
-    'tucao'            : 'tucao',
-    'tudou'            : 'tudou',
-    'tumblr'           : 'tumblr',
-    'twimg'            : 'twitter',
-    'twitter'          : 'twitter',
-    'ucas'             : 'ucas',
-    'videomega'        : 'videomega',
-    'vidto'            : 'vidto',
-    'vimeo'            : 'vimeo',
-    'wanmen'           : 'wanmen',
-    'weibo'            : 'miaopai',
-    'veoh'             : 'veoh',
-    'vine'             : 'vine',
-    'vk'               : 'vk',
-    'xiami'            : 'xiami',
-    'xiaokaxiu'        : 'yixia',
-    'xiaojiadianvideo' : 'fc2video',
-    'ximalaya'         : 'ximalaya',
-    'yinyuetai'        : 'yinyuetai',
-    'miaopai'          : 'yixia',
-    'yizhibo'          : 'yizhibo',
-    'youku'            : 'youku',
-    'iwara'            : 'iwara',
-    'youtu'            : 'youtube',
-    'youtube'          : 'youtube',
-    'zhanqi'           : 'zhanqi',
-    '365yg'            : 'toutiao',
+    '163': 'netease',
+    '56': 'w56',
+    'acfun': 'acfun',
+    'archive': 'archive',
+    'baidu': 'baidu',
+    'bandcamp': 'bandcamp',
+    'baomihua': 'baomihua',
+    'bigthink': 'bigthink',
+    'bilibili': 'bilibili',
+    'cctv': 'cntv',
+    'cntv': 'cntv',
+    'cbs': 'cbs',
+    'coub': 'coub',
+    'dailymotion': 'dailymotion',
+    'dilidili': 'dilidili',
+    'douban': 'douban',
+    'douyin': 'douyin',
+    'douyu': 'douyutv',
+    'ehow': 'ehow',
+    'facebook': 'facebook',
+    'fantasy': 'fantasy',
+    'fc2': 'fc2video',
+    'flickr': 'flickr',
+    'freesound': 'freesound',
+    'fun': 'funshion',
+    'google': 'google',
+    'giphy': 'giphy',
+    'heavy-music': 'heavymusic',
+    'huaban': 'huaban',
+    'huomao': 'huomaotv',
+    'iask': 'sina',
+    'icourses': 'icourses',
+    'ifeng': 'ifeng',
+    'imgur': 'imgur',
+    'in': 'alive',
+    'infoq': 'infoq',
+    'instagram': 'instagram',
+    'interest': 'interest',
+    'iqilu': 'iqilu',
+    'iqiyi': 'iqiyi',
+    'ixigua': 'ixigua',
+    'isuntv': 'suntv',
+    'joy': 'joy',
+    'kankanews': 'bilibili',
+    'khanacademy': 'khan',
+    'ku6': 'ku6',
+    'kuaishou': 'kuaishou',
+    'kugou': 'kugou',
+    'kuwo': 'kuwo',
+    'le': 'le',
+    'letv': 'le',
+    'lizhi': 'lizhi',
+    'longzhu': 'longzhu',
+    'magisto': 'magisto',
+    'metacafe': 'metacafe',
+    'mgtv': 'mgtv',
+    'miomio': 'miomio',
+    'mixcloud': 'mixcloud',
+    'mtv81': 'mtv81',
+    'musicplayon': 'musicplayon',
+    'naver': 'naver',
+    '7gogo': 'nanagogo',
+    'nicovideo': 'nicovideo',
+    'panda': 'panda',
+    'pinterest': 'pinterest',
+    'pixnet': 'pixnet',
+    'pptv': 'pptv',
+    'qingting': 'qingting',
+    'qq': 'qq',
+    'quanmin': 'quanmin',
+    'showroom-live': 'showroom',
+    'sina': 'sina',
+    'smgbb': 'bilibili',
+    'sohu': 'sohu',
+    'soundcloud': 'soundcloud',
+    'ted': 'ted',
+    'theplatform': 'theplatform',
+    'tucao': 'tucao',
+    'tudou': 'tudou',
+    'tumblr': 'tumblr',
+    'twimg': 'twitter',
+    'twitter': 'twitter',
+    'ucas': 'ucas',
+    'videomega': 'videomega',
+    'vidto': 'vidto',
+    'vimeo': 'vimeo',
+    'wanmen': 'wanmen',
+    'weibo': 'miaopai',
+    'veoh': 'veoh',
+    'vine': 'vine',
+    'vk': 'vk',
+    'xiami': 'xiami',
+    'xiaokaxiu': 'yixia',
+    'xiaojiadianvideo': 'fc2video',
+    'ximalaya': 'ximalaya',
+    'yinyuetai': 'yinyuetai',
+    'miaopai': 'yixia',
+    'yizhibo': 'yizhibo',
+    'youku': 'youku',
+    'iwara': 'iwara',
+    'youtu': 'youtube',
+    'youtube': 'youtube',
+    'zhanqi': 'zhanqi',
+    '365yg': 'toutiao',
 }
 
 dry_run = False
@@ -331,7 +346,7 @@ def undeflate(data):
     """
     import zlib
     decompressobj = zlib.decompressobj(-zlib.MAX_WBITS)
-    return decompressobj.decompress(data)+decompressobj.flush()
+    return decompressobj.decompress(data) + decompressobj.flush()
 
 
 # DEPRECATED in favor of get_content()
@@ -598,8 +613,8 @@ def url_locations(urls, faker=False, headers={}):
 
 
 def url_save(
-    url, filepath, bar, refer=None, is_part=False, faker=False,
-    headers=None, timeout=None, **kwargs
+        url, filepath, bar, refer=None, is_part=False, faker=False,
+        headers=None, timeout=None, **kwargs
 ):
     tmp_headers = headers.copy() if headers is not None else {}
     # When a referer specified with param refer,
@@ -637,6 +652,7 @@ def url_save(
                         else:
                             def numreturn(a):
                                 return ' (' + str(int(a.group()[2:-1]) + 1) + ').'
+
                             thisfile = finder.sub(numreturn, path) + ext
                         filepath = os.path.join(os.path.dirname(filepath), thisfile)
                         print('Changing name to %s' % tr(os.path.basename(filepath)), '...')
@@ -760,7 +776,7 @@ class SimpleProgressBar:
         total_str = '%5s' % round(self.total_size / 1048576, 1)
         total_str_width = max(len(total_str), 5)
         self.bar_size = self.term_size - 28 - 2 * total_pieces_len \
-            - 2 * total_str_width
+                        - 2 * total_str_width
         self.bar = '{:>4}%% ({:>%s}/%sMB) ├{:─<%s}┤[{:>%s}/{:>%s}] {}' % (
             total_str_width, total_str, self.bar_size, total_pieces_len,
             total_pieces_len
@@ -893,14 +909,16 @@ def get_output_filename(urls, title, ext, output_dir, merge, custom_filename=Non
                 merged_ext = 'ts'
     return '%s.%s' % (title, merged_ext)
 
+
 def print_user_agent(faker=False):
     urllib_default_user_agent = 'Python-urllib/%d.%d' % sys.version_info[:2]
     user_agent = fake_headers['User-Agent'] if faker else urllib_default_user_agent
     print('User Agent: %s' % user_agent)
 
+
 def download_urls(
-    urls, title, ext, total_size, output_dir='.', refer=None, merge=True,
-    faker=False, headers=None, **kwargs
+        urls, title, ext, total_size, output_dir='.', refer=None, merge=True,
+        faker=False, headers=None, **kwargs
 ):
     global output_filename
     if headers is None:
@@ -935,7 +953,7 @@ def download_urls(
     result_output_filepath = os.path.join(output_dir, result_output_filename)
 
     if total_size:
-        if not force and os.path.exists(result_output_filepath) and not auto_rename\
+        if not force and os.path.exists(result_output_filepath) and not auto_rename \
                 and os.path.getsize(result_output_filepath) >= total_size * 0.9:
             print('Skipping %s: file already exists' % result_output_filepath)
             print()
@@ -1043,8 +1061,8 @@ def download_urls(
 
 
 def download_rtmp_url(
-    url, title, ext, params={}, total_size=0, output_dir='.', refer=None,
-    merge=True, faker=False
+        url, title, ext, params={}, total_size=0, output_dir='.', refer=None,
+        merge=True, faker=False
 ):
     assert url
     if dry_run:
@@ -1063,12 +1081,12 @@ def download_rtmp_url(
         has_rtmpdump_installed, download_rtmpdump_stream
     )
     assert has_rtmpdump_installed(), 'RTMPDump not installed.'
-    download_rtmpdump_stream(url,  title, ext, params, output_dir)
+    download_rtmpdump_stream(url, title, ext, params, output_dir)
 
 
 def download_url_ffmpeg(
-    url, title, ext, params={}, total_size=0, output_dir='.', refer=None,
-    merge=True, faker=False, stream=True
+        url, title, ext, params={}, total_size=0, output_dir='.', refer=None,
+        merge=True, faker=False, stream=True
 ):
     assert url
     if dry_run:
@@ -1090,7 +1108,7 @@ def download_url_ffmpeg(
         dotPos = output_filename.rfind('.')
         if dotPos > 0:
             title = output_filename[:dotPos]
-            ext = output_filename[dotPos+1:]
+            ext = output_filename[dotPos + 1:]
         else:
             title = output_filename
 
@@ -1102,6 +1120,7 @@ def download_url_ffmpeg(
 def playlist_not_supported(name):
     def f(*args, **kwargs):
         raise NotImplementedError('Playlist is not supported for ' + name)
+
     return f
 
 
@@ -1324,6 +1343,7 @@ def set_socks_proxy(proxy):
             return [
                 (socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))
             ]
+
         socket.getaddrinfo = getaddrinfo
     except ImportError:
         log.w(
@@ -1602,7 +1622,7 @@ def google_search(url):
         print('# you-get %s' % log.sprint(v[0][0], log.UNDERLINE))
         print()
     print('Best matched result:')
-    return(videos[0][0])
+    return (videos[0][0])
 
 
 def url_to_module(url):
